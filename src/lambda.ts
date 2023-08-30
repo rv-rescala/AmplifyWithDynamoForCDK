@@ -1,7 +1,5 @@
 import { procedure  } from "./dynamoTest";
 
-const tableName = process.env.TABLE_NAME || '';
-
 export const handler = async (event: any): Promise<any> => {
   try {
     const r = await procedure();

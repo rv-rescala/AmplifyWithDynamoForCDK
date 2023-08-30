@@ -1,76 +1,36 @@
-import * as AWS from 'aws-sdk';
+import { DynamoDBClinet } from './client';
 
-// AWS ENV
-const isRunningOnLambda = !!process.env.AWS_EXECUTION_ENV;
+const TABLE_NAME = process.env.Todo || `TodoTable`;
 
-let dynamoDbConfig = {};
-
-if (isRunningOnLambda) {
-  dynamoDbConfig = {
-    region: 'us-west-2',
-  };
-} else {
-  dynamoDbConfig = {
-    region: 'localhost',
-    endpoint: 'http://localhost:8000',
-  };
-}
-
-AWS.config.update(dynamoDbConfig);
-
-const docClient = new AWS.DynamoDB.DocumentClient();
-const dynamoDb = new AWS.DynamoDB();
-
-async function createTable() {
-  const params = {
-    TableName : 'DynamoLocalTest',
-    KeySchema: [       
-        { AttributeName: 'id', KeyType: 'HASH'},  // Partition key
-    ],
-    AttributeDefinitions: [       
-        { AttributeName: 'id', AttributeType: 'N' },
-    ],
-    ProvisionedThroughput: {       
-        ReadCapacityUnits: 5, 
-        WriteCapacityUnits: 5
+async function putItem(client: DynamoDBClinet) {
+  const timestamp = new Date().toISOString();
+  const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
+    TableName: TABLE_NAME,
+    Item: {
+      id: '1',
+      name: timestamp.toString(),
+      createdAt: timestamp,
+      updatedAt: timestamp
     }
   };
-
   try {
-    const data = await dynamoDb.createTable(params).promise();
-    console.log("Created table:", JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error("Unable to create table:", JSON.stringify(err, null, 2));
-  }
-}
-
-async function putItem() {
-  const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
-    TableName: 'DynamoLocalTest',
-    Item: {
-      id: 1,
-      name: 'John',
-    },
-  };
-
-  try {
-    const data = await docClient.put(params).promise();
+    const data = await client.docClient.put(params).promise();
     console.log('Item inserted:', JSON.stringify(data, null, 2));
   } catch (err) {
     console.error('Error inserting item:', JSON.stringify(err, null, 2));
   }
 }
 
-async function getItem(): Promise<string> {
+async function getItems(client: DynamoDBClinet): Promise<string> {
   const params: AWS.DynamoDB.DocumentClient.GetItemInput = {
-    TableName: 'DynamoLocalTest',
+    TableName: TABLE_NAME,
     Key: {
-      id: 1,
+      id: '1',
     },
   };
 
   try {
-    const data = await docClient.get(params).promise();
+    const data = await client.docClient.get(params).promise();
     console.log('Item fetched:', JSON.stringify(data, null, 2));
     return JSON.stringify(data, null, 2);
   } catch (err) {
@@ -79,8 +39,9 @@ async function getItem(): Promise<string> {
   }
 }
 
-export async function procedure() {
-  await createTable();
-  await putItem();
-  return await getItem();
+export async function procedure(endpointURL: string = '') {
+  console.log('table name', TABLE_NAME);
+  const clinet = new DynamoDBClinet(endpointURL);
+  await putItem(clinet);
+  return await getItems(clinet);
 }
